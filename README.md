@@ -41,7 +41,7 @@ import (
     "convert/example/b"
 )
 
-//go:generate convert -src=a.A -tgt=b.B
+//go:generate convert -from=a.A -to=b.B
 func ConvertAToB(a *a.A) *b.B {
     return nil
 }
@@ -57,17 +57,17 @@ import (
     "convert/example/b"
 )
 
-//go:generate convert -src=a.A -tgt=b.B
-func ConvertAToB(a *a.A) *b.B {
-    b := &b.B{}
-    if a.Age != nil {
-        b.Age = int(*a.Age)
-    }
-    if a.High != nil {
-        b.High = *a.High
-    }
-    b.Name = &a.Name
-    return b
+//go:generate convert -from=a.A -to=b.B
+func ConvertAAToBB(from *a.A) *b.B {
+	to := &b.B{}
+	if from.Age != nil {
+		to.Age = int(*from.Age)
+	}
+	if from.High != nil {
+		to.High = *from.High
+	}
+	to.Name = &from.Name
+	return to
 }
 ```
 ## 3、 Why not json or reflect

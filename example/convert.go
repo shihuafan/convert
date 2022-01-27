@@ -6,14 +6,14 @@ import (
 )
 
 //go:generate convert -from=a.A -to=b.B
-func ConvertAToB(a *a.A) *b.B {
-	b := &b.B{}
-	if a.Age != nil {
-		b.Age = int(*a.Age)
+func ConvertAAToBB(from *a.A) *b.B {
+	to := &b.B{}
+	if from.Age != nil {
+		to.Age = int(*from.Age)
 	}
-	if a.High != nil {
-		b.High = *a.High
+	if from.High != nil {
+		to.High = *from.High
 	}
-	b.Name = &a.Name
-	return b
+	to.Name = &from.Name
+	return to
 }

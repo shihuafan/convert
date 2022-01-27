@@ -17,11 +17,10 @@ import (
 )
 
 type StructType struct {
-	FullName  string
-	Name      string
-	FieldName string
-	Pkg       *packages.Package
-	Content   map[string]string
+	FullName string
+	Name     string
+	Pkg      *packages.Package
+	Content  map[string]string
 }
 
 type Convert struct {
@@ -59,7 +58,11 @@ func main() {
 		fmt.Println("build to struct fail")
 		return
 	}
-	convert.write()
+	if convert.write() == nil {
+		fmt.Println("ok!")
+	} else {
+		fmt.Println("sorry, an error has occured!")
+	}
 }
 
 func buildStructType(locationPkg *packages.Package, allPkgs map[string]*packages.Package, filed string) *StructType {
@@ -72,11 +75,6 @@ func buildStructType(locationPkg *packages.Package, allPkgs map[string]*packages
 	} else {
 		result.Name = filed
 		result.Pkg = locationPkg
-	}
-	if len(result.Name) > 1 {
-		result.FieldName = strings.ToLower(result.Name[:1]) + result.Name[1:]
-	} else {
-		result.FieldName = strings.ToLower(result.Name)
 	}
 
 	res := findAllFieldsFromPkg(result.Pkg)
@@ -94,39 +92,39 @@ func indexOf(ss []string, s string) int {
 	}
 	return -1
 }
-func stringfySingle(fromName, toName, name string, fromType, toType string) string {
+func stringfySingle(name string, fromType, toType string) string {
 	if fromType == toType {
-		return fmt.Sprintf("\t%v.%v = %v.%v\n", toName, name, fromName, name)
+		return fmt.Sprintf("\tto.%v = from.%v\n", name, name)
 	}
 	if "*"+fromType == toType {
-		return fmt.Sprintf("\t%v.%v = &%v.%v\n", toName, name, fromName, name)
+		return fmt.Sprintf("\tto.%v = &from.%v\n", name, name)
 	}
 	if fromType == "*"+toType {
-		result := fmt.Sprintf("\tif %v.%v != nil {\n", fromName, name)
-		result += fmt.Sprintf("\t\t%v.%v = *%v.%v\n", toName, name, fromName, name)
+		result := fmt.Sprintf("\tif from.%v != nil {\n", name)
+		result += fmt.Sprintf("\t\tto.%v = *from.%v\n", name, name)
 		result += "\t}\n"
 		return result
 	}
 	// 判断能不能转换
 	if indexOf(raw, strings.ReplaceAll(fromType, "*", "")) < indexOf(raw, strings.ReplaceAll(toType, "*", "")) {
 		if !strings.HasPrefix(fromType, "*") && !strings.HasPrefix(toType, "*") {
-			return fmt.Sprintf("\t%v.%v = %v(%v.%v)\n", toName, name, toType, fromName, name)
+			return fmt.Sprintf("\tto.%v = %v(from.%v)\n", name, toType, name)
 		}
 		if strings.HasPrefix(fromType, "*") && !strings.HasPrefix(toType, "*") {
-			result := fmt.Sprintf("\tif %v.%v != nil {\n", fromName, name)
-			result += fmt.Sprintf("\t\t%v.%v = %v(*%v.%v)\n", toName, name, toType, fromName, name)
+			result := fmt.Sprintf("\tif from.%v != nil {\n", name)
+			result += fmt.Sprintf("\t\tto.%v = %v(*from.%v)\n", name, toType, name)
 			result += "\t}\n"
 			return result
 		}
 		if !strings.HasPrefix(fromType, "*") && strings.HasPrefix(toType, "*") {
-			result := fmt.Sprintf("\t%vTemp := %v(%v.%v)\n", name, toType, fromName, name)
-			result += fmt.Sprintf("\t%v.%v = &(%vTemp)\n", toName, name, name)
+			result := fmt.Sprintf("\t%vTemp := %v(from.%v)\n", name, toType, name)
+			result += fmt.Sprintf("\tto.%v = &(%vTemp)\n", name, name)
 			return result
 		}
 		if strings.HasPrefix(fromType, "*") && strings.HasPrefix(toType, "*") {
-			result := fmt.Sprintf("\tif %v.%v != nil {\n", fromName, name)
-			result += fmt.Sprintf("\t\t%vTemp := %v(*%v.%v)\n", name, strings.ReplaceAll(toType, "*", ""), fromName, name)
-			result += fmt.Sprintf("\t\t%v.%v = &%vTemp\n", toName, name, name)
+			result := fmt.Sprintf("\tif from.%v != nil {\n", name)
+			result += fmt.Sprintf("\t\t%vTemp := %v(*from.%v)\n", name, strings.ReplaceAll(toType, "*", ""), name)
+			result += fmt.Sprintf("\t\tto.%v = &%vTemp\n", name, name)
 			result += "\t}\n"
 			return result
 		}
@@ -135,11 +133,11 @@ func stringfySingle(fromName, toName, name string, fromType, toType string) stri
 
 }
 
-func (c *Convert) write() {
-	functionName := fmt.Sprintf("Convert%vTo%v", c.from.Name, c.to.Name)
-	functionContent := fmt.Sprintf("func %v(%v *%v) *%v {\n",
-		functionName, c.from.FieldName, c.from.FullName, c.to.FullName)
-	functionContent += fmt.Sprintf("\t%v := &%v{}\n", c.to.FieldName, c.to.FullName)
+func (c *Convert) write() error {
+	functionName := fmt.Sprintf("Convert%v%vTo%v%v", capitalize(c.from.Pkg.Name), c.from.Name, capitalize(c.to.Pkg.Name), c.to.Name)
+	functionContent := fmt.Sprintf("func %v(from *%v) *%v {\n",
+		functionName, c.from.FullName, c.to.FullName)
+	functionContent += fmt.Sprintf("\tto := &%v{}\n", c.to.FullName)
 	var names []string
 	for name := range c.from.Content {
 		if _, ok := c.to.Content[name]; ok {
@@ -148,9 +146,9 @@ func (c *Convert) write() {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		functionContent += stringfySingle(c.from.FieldName, c.to.FieldName, name, c.from.Content[name], c.to.Content[name])
+		functionContent += stringfySingle(name, c.from.Content[name], c.to.Content[name])
 	}
-	functionContent += fmt.Sprintf("\treturn %v\n}", c.to.FieldName)
+	functionContent += "\treturn to\n}"
 
 	convertFile, err := os.OpenFile("convert.go", os.O_RDWR, os.ModeAppend)
 	if pathErr := (*os.PathError)(nil); errors.As(err, &pathErr) {
@@ -186,7 +184,7 @@ func (c *Convert) write() {
 
 	convertFile.Seek(0, 0)
 	_, err = convertFile.Write(buf.Bytes())
-	fmt.Println(err)
+	return err
 }
 
 func findAllFieldsFromPkg(pkg *packages.Package) (fields map[string]map[string]string) {
@@ -227,4 +225,12 @@ func listAllPkgs(pkg *packages.Package) map[string]*packages.Package {
 		result[value.Name] = value
 	}
 	return result
+}
+
+func capitalize(str string) string {
+	r := []rune(str)
+	if r[0] >= 97 && r[0] <= 122 {
+		r[0] -= 32
+	}
+	return string(r)
 }
