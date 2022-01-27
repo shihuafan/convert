@@ -55,12 +55,12 @@ func main() {
 		fmt.Println("build from struct fail")
 		return
 	}
-	c.from.FieldName = "from"
+	convert.from.FieldName = "from"
 	if convert.to = buildStructType(locationPkg, allPkgs, *to); convert.to == nil {
 		fmt.Println("build to struct fail")
 		return
 	}
-	c.to.FieldName = "to"
+	convert.to.FieldName = "to"
 	convert.write()
 }
 
