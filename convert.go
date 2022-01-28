@@ -106,28 +106,35 @@ func stringfySingle(name string, fromType, toType string) string {
 		return result
 	}
 	// 判断能不能转换
-	if indexOf(raw, strings.ReplaceAll(fromType, "*", "")) < indexOf(raw, strings.ReplaceAll(toType, "*", "")) {
-		if !strings.HasPrefix(fromType, "*") && !strings.HasPrefix(toType, "*") {
-			return fmt.Sprintf("\tto.%v = %v(from.%v)\n", name, toType, name)
+	fromIdx := indexOf(raw, strings.ReplaceAll(fromType, "*", ""))
+	toIdx := indexOf(raw, strings.ReplaceAll(toType, "*", ""))
+	if fromIdx >= 0 && toIdx >= 0 {
+		result := ""
+		if fromIdx > toIdx {
+			result += fmt.Sprintf("\t// %v -> %v\n", fromType, toType)
 		}
-		if strings.HasPrefix(fromType, "*") && !strings.HasPrefix(toType, "*") {
-			result := fmt.Sprintf("\tif from.%v != nil {\n", name)
+		if !strings.HasPrefix(fromType, "*") && !strings.HasPrefix(toType, "*") {
+			// i -> i
+			result += fmt.Sprintf("\tto.%v = %v(from.%v)\n", name, toType, name)
+		} else if strings.HasPrefix(fromType, "*") && !strings.HasPrefix(toType, "*") {
+			// *i -> i
+			result += fmt.Sprintf("\tif from.%v != nil {\n", name)
 			result += fmt.Sprintf("\t\tto.%v = %v(*from.%v)\n", name, toType, name)
 			result += "\t}\n"
-			return result
-		}
-		if !strings.HasPrefix(fromType, "*") && strings.HasPrefix(toType, "*") {
-			result := fmt.Sprintf("\t%vTemp := %v(from.%v)\n", name, toType, name)
-			result += fmt.Sprintf("\tto.%v = &(%vTemp)\n", name, name)
-			return result
-		}
-		if strings.HasPrefix(fromType, "*") && strings.HasPrefix(toType, "*") {
-			result := fmt.Sprintf("\tif from.%v != nil {\n", name)
-			result += fmt.Sprintf("\t\t%vTemp := %v(*from.%v)\n", name, strings.ReplaceAll(toType, "*", ""), name)
-			result += fmt.Sprintf("\t\tto.%v = &%vTemp\n", name, name)
+		} else if !strings.HasPrefix(fromType, "*") && strings.HasPrefix(toType, "*") {
+			// i -> *i
+			tempName := lowwer(name) + "Temp"
+			result += fmt.Sprintf("\t%v := %v(from.%v)\n", tempName, toType[1:], name)
+			result += fmt.Sprintf("\tto.%v = &%v\n", name, tempName)
+		} else if strings.HasPrefix(fromType, "*") && strings.HasPrefix(toType, "*") {
+			// *i -> *i
+			tempName := lowwer(name) + "Temp"
+			result += fmt.Sprintf("\tif from.%v != nil {\n", name)
+			result += fmt.Sprintf("\t\t%v := %v(*from.%v)\n", tempName, toType[1:], name)
+			result += fmt.Sprintf("\t\tto.%v = &%v\n", name, tempName)
 			result += "\t}\n"
-			return result
 		}
+		return result
 	}
 	return ""
 
@@ -231,6 +238,14 @@ func capitalize(str string) string {
 	r := []rune(str)
 	if r[0] >= 97 && r[0] <= 122 {
 		r[0] -= 32
+	}
+	return string(r)
+}
+
+func lowwer(str string) string {
+	r := []rune(str)
+	if r[0] >= 65 && r[0] <= 90 {
+		r[0] += 32
 	}
 	return string(r)
 }
