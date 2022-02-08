@@ -144,6 +144,7 @@ func (c *Convert) write() error {
 	functionName := fmt.Sprintf("Convert%v%vTo%v%v", capitalize(c.from.Pkg.Name), c.from.Name, capitalize(c.to.Pkg.Name), c.to.Name)
 	functionContent := fmt.Sprintf("func %v(from *%v) *%v {\n",
 		functionName, c.from.FullName, c.to.FullName)
+	functionContent += "\tif from == nil {\n\t\treturn nil\n\t}\n"
 	functionContent += fmt.Sprintf("\tto := &%v{}\n", c.to.FullName)
 	var names []string
 	for name := range c.from.Content {
